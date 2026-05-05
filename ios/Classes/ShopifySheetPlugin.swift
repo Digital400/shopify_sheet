@@ -17,6 +17,8 @@ public class ShopifySheetPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
+        case "getPlatformVersion":
+            result("iOS \(UIDevice.current.systemVersion)")
         case "launchCheckout":
             guard let args = call.arguments as? [String: Any],
                   let checkoutUrl = args["checkoutUrl"] as? String else {
@@ -54,7 +56,8 @@ public class ShopifySheetPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
         }
 
         DispatchQueue.main.async {
-            guard let rootViewController = UIApplication.shared.windows.first?.rootViewController else {
+            // UIApplication.shared.windows is empty on iOS 13+ with scene-based lifecycle; use UIWindowScene.
+            guard let rootViewController = Self.keyWindow()?.rootViewController else {
                 result(FlutterError(code: "INVALID_CONTEXT", message: "No valid root view controller", details: nil))
                 return
             }
@@ -89,6 +92,15 @@ public class ShopifySheetPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
             ShopifyCheckoutSheetKit.configuration.title = title
         }
 
+        // WebView / sheet background: prefer backgroundColor, else titleBarBackgroundColor (Android maps both separately).
+        if let bgHex = configMap["backgroundColor"] as? String,
+           let ui = hexToUIColor(hex: bgHex) {
+            ShopifyCheckoutSheetKit.configuration.backgroundColor = ui
+        } else if let headerBgHex = configMap["titleBarBackgroundColor"] as? String,
+                  let ui = hexToUIColor(hex: headerBgHex) {
+            ShopifyCheckoutSheetKit.configuration.backgroundColor = ui
+        }
+
         // Tint color
         if let tintColor = configMap["tintColor"] as? String,
            let color = hexToUIColor(hex: tintColor) {
@@ -99,6 +111,11 @@ public class ShopifySheetPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
         if let closeButtonTintColor = configMap["closeButtonTintColor"] as? String,
            let color = hexToUIColor(hex: closeButtonTintColor) {
             ShopifyCheckoutSheetKit.configuration.closeButtonTintColor = color
+        }
+
+        // Preloading (same flag as Android; see ShopifyCheckoutSheetKit.Configuration.Preloading)
+        if let preload = configMap["preload"] as? Bool {
+            ShopifyCheckoutSheetKit.configuration.preloading.enabled = preload
         }
     }
 
@@ -117,6 +134,30 @@ public class ShopifySheetPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
         let blue = CGFloat(rgb & 0x0000FF) / 255.0
 
         return UIColor(red: red, green: green, blue: blue, alpha: 1.0)
+    }
+
+    /// Resolves the key window for scene-based apps. `UIApplication.shared.windows` is often empty on iOS 13+.
+    private static func keyWindow() -> UIWindow? {
+        if let delegateWindow = (UIApplication.shared.delegate as? FlutterAppDelegate)?.window {
+            return delegateWindow
+        }
+        if #available(iOS 13.0, *) {
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            if let window = scenes
+                .first(where: { $0.activationState == .foregroundActive })?
+                .windows
+                .first(where: { $0.isKeyWindow }) {
+                return window
+            }
+            if let window = scenes.flatMap({ $0.windows }).first(where: { $0.isKeyWindow }) {
+                return window
+            }
+            if let window = scenes.flatMap({ $0.windows }).first {
+                return window
+            }
+        }
+        return UIApplication.shared.windows.first(where: { $0.isKeyWindow })
+            ?? UIApplication.shared.windows.first
     }
 
     private func closeCheckout(result: @escaping FlutterResult) {

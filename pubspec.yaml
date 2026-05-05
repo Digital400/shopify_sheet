@@ -1,11 +1,11 @@
 name: shopify_sheet
 description: "Flutter Shopify Checkout Sheet Plugin"
 version: 0.0.7
-homepage: https://github.com/farooq958/shopify_sheet
+homepage: https://github.com/Digital400/shopify_sheet
 
 environment:
-  sdk: ^3.9.0
-  flutter: '>=3.35.0'
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.16.0'
 
 dependencies:
   flutter:

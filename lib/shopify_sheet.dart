@@ -102,7 +102,11 @@ class ShopifySheetConfiguration {
   /// Close button tint color (hex string format: "#RRGGBB") (iOS only)
   final String? closeButtonTintColor;
 
-  /// Enable preloading of checkout
+  /// Header title / bar text color (hex string format: "#RRGGBB") (Android only; maps to headerFont).
+  /// Ignored on iOS — ShopifyCheckoutSheetKit does not expose a separate header text color.
+  final String? headerTextColor;
+
+  /// Enable preloading of checkout (Android and iOS).
   final bool? preload;
 
   /// Color scheme preference (light, dark, automatic, or web)
@@ -114,13 +118,15 @@ class ShopifySheetConfiguration {
     this.backgroundColor,
     this.tintColor,
     this.closeButtonTintColor,
+    this.headerTextColor,
     this.preload,
     this.colorScheme = 'automatic',
   });
 
   /// Convert Flutter Color to hex string
   static String colorToHex(Color color) {
-    return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
+    final argb = color.toARGB32();
+    return '#${argb.toRadixString(16).substring(2).toUpperCase()}';
   }
 
   /// Create configuration with Flutter Colors
@@ -130,6 +136,7 @@ class ShopifySheetConfiguration {
     Color? backgroundColor,
     Color? tintColor,
     Color? closeButtonTintColor,
+    Color? headerTextColor,
     bool? preload,
     String? colorScheme,
   }) {
@@ -139,6 +146,7 @@ class ShopifySheetConfiguration {
       backgroundColor: backgroundColor != null ? colorToHex(backgroundColor) : null,
       tintColor: tintColor != null ? colorToHex(tintColor) : null,
       closeButtonTintColor: closeButtonTintColor != null ? colorToHex(closeButtonTintColor) : null,
+      headerTextColor: headerTextColor != null ? colorToHex(headerTextColor) : null,
       preload: preload,
       colorScheme: colorScheme ?? 'automatic',
     );
@@ -152,6 +160,7 @@ class ShopifySheetConfiguration {
       if (backgroundColor != null) 'backgroundColor': backgroundColor,
       if (tintColor != null) 'tintColor': tintColor,
       if (closeButtonTintColor != null) 'closeButtonTintColor': closeButtonTintColor,
+      if (headerTextColor != null) 'headerTextColor': headerTextColor,
       if (preload != null) 'preload': preload,
       if (colorScheme != null) 'colorScheme': colorScheme,
     };

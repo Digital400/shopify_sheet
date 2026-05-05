@@ -2,14 +2,15 @@ package com.checkoutsheetshopify.shopify_sheet
 
 import android.app.Activity
 import android.graphics.Color
+import android.os.Build
 import androidx.annotation.NonNull
 import com.shopify.checkoutsheetkit.ShopifyCheckoutSheetKit
 import com.shopify.checkoutsheetkit.DefaultCheckoutEventProcessor
 import com.shopify.checkoutsheetkit.lifecycleevents.CheckoutCompletedEvent
 import com.shopify.checkoutsheetkit.CheckoutException
 import com.shopify.checkoutsheetkit.ColorScheme
-import com.shopify.checkoutsheetkit.Configuration
 import com.shopify.checkoutsheetkit.Colors
+import com.shopify.checkoutsheetkit.Color as ShopifyColor
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -17,9 +18,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
 import android.util.Log
-import com.shopify.checkoutsheetkit.CheckoutSheetKitDialog
-import com.shopify.checkoutsheetkit.LogLevel
 import com.shopify.checkoutsheetkit.Preloading
+import com.shopify.checkoutsheetkit.CheckoutSheetKitDialog
 
 /** ShopifySheetPlugin */
 class ShopifySheetPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
@@ -53,6 +53,10 @@ class ShopifySheetPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "getPlatformVersion" -> {
+                result.success("Android ${Build.VERSION.RELEASE}")
+            }
+
             "launchCheckout" -> {
                 val checkoutUrl = call.argument<String>("checkoutUrl")
                 val configMap = call.argument<Map<String, Any>>("config")
@@ -133,41 +137,52 @@ class ShopifySheetPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
     private fun applyConfiguration(configMap: Map<String, Any>) {
         try {
             ShopifyCheckoutSheetKit.configure { config ->
-                // Color scheme configuration
-                configMap["colorScheme"]?.let { scheme ->
-                    config.colorScheme = when (scheme as String) {
-                        "light" -> ColorScheme.Light()
-                        "dark" -> ColorScheme.Dark()
-                        "web" -> ColorScheme.Web()
-                        else -> ColorScheme.Automatic()
+                val hasCustomColors = listOf(
+                    "backgroundColor",
+                    "titleBarBackgroundColor",
+                    "tintColor",
+                    "headerTextColor",
+                    "closeButtonTintColor"
+                ).any { key -> (configMap[key] as? String)?.isNotBlank() == true }
+
+                if (hasCustomColors) {
+                    val bgHex = (configMap["backgroundColor"] as? String)?.takeIf { it.isNotBlank() }
+                    val headerBgHex =
+                        (configMap["titleBarBackgroundColor"] as? String)?.takeIf { it.isNotBlank() }
+                    val tintHex = (configMap["tintColor"] as? String)?.takeIf { it.isNotBlank() }
+                    val headerFontHex =
+                        (configMap["headerTextColor"] as? String)?.takeIf { it.isNotBlank() }
+                    val closeTintHex =
+                        (configMap["closeButtonTintColor"] as? String)?.takeIf { it.isNotBlank() }
+
+                    val webViewArgb = parseColor(bgHex ?: headerBgHex ?: "#FFFFFF")
+                    val headerBgArgb = parseColor(headerBgHex ?: bgHex ?: "#FFFFFF")
+                    val headerFontArgb = parseColor(headerFontHex ?: "#000000")
+                    val progressArgb = parseColor(tintHex ?: "#757575")
+                    val closeTintArgb = closeTintHex?.let { parseColor(it) }
+
+                    val colors = Colors(
+                        webViewBackground = ShopifyColor.SRGB(webViewArgb),
+                        headerBackground = ShopifyColor.SRGB(headerBgArgb),
+                        headerFont = ShopifyColor.SRGB(headerFontArgb),
+                        progressIndicator = ShopifyColor.SRGB(progressArgb),
+                        closeIconTint = closeTintArgb?.let { ShopifyColor.SRGB(it) }
+                    )
+                    config.colorScheme = ColorScheme.Web(colors)
+                } else {
+                    configMap["colorScheme"]?.let { scheme ->
+                        config.colorScheme = when (scheme as String) {
+                            "light" -> ColorScheme.Light()
+                            "dark" -> ColorScheme.Dark()
+                            "web" -> ColorScheme.Web()
+                            else -> ColorScheme.Automatic()
+                        }
                     }
                 }
 
-                // Title configuration (Android reads from strings.xml)
-                // Note: On Android, title must be set via res/values/strings.xml
-                // with key "checkout_web_view_title"
-
-                // Colors configuration
-                val titleBarBg = configMap["titleBarBackgroundColor"] as? String
-                val bgColor = configMap["backgroundColor"] as? String
-                val tintColor = configMap["tintColor"] as? String
-                val titleBarText = configMap["title"] as? String?
-
-                // Only set colors if we're using Web or Automatic with overrides
-
-
-
-
-
-                // Preloading configuration
                 configMap["preload"]?.let { preload ->
-
-                    config.preloading =  Preloading(enabled = preload as Boolean)
-
+                    config.preloading = Preloading(enabled = preload as Boolean)
                 }
-
-                // Optional: Uncomment for debug logging
-                // config.logLevel = LogLevel.DEBUG
             }
         } catch (e: Exception) {
             Log.e("ShopifySheetPlugin", "Error applying configuration", e)
